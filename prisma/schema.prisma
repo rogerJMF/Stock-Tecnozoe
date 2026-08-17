@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Color {
+  id_Color Int        @id @default(autoincrement()) @map("id_Color")
+  nombre   String
+  productos Producto[]
+  @@map("Color")
+}
+
+model Marca {
+  id_Marca Int        @id @default(autoincrement()) @map("id_Marca")
+  nombre   String
+  productos Producto[]
+  @@map("Marca")
+}
+
+model Ram {
+  id_Ram   Int        @id @default(autoincrement()) @map("id_Ram")
+  valor    String
+  productos Producto[]
+  @@map("Ram")
+}
+
+model Almacenamiento {
+  id_Almacenamiento Int        @id @default(autoincrement()) @map("id_Almacenamiento")
+  Capacidad        String
+  productos        Producto[]
+  @@map("Almacenamiento")
+}
+
+model Producto {
+  id_Producto                Int               @id @default(autoincrement()) @map("id_Producto")
+  nombre                     String
+  modelo                     String
+  Stock_minimo_alerta        Int               @default(3) @map("Stock_minimo_alerta")
+  Color_id_Color             Int?              @map("Color_id_Color")
+  Color                      Color?            @relation(fields: [Color_id_Color], references: [id_Color])
+  Ram_id_Ram                 Int?              @map("Ram_id_Ram")
+  Ram                        Ram?              @relation(fields: [Ram_id_Ram], references: [id_Ram])
+  Marca_id_Marca             Int               @map("Marca_id_Marca")
+  Marca                      Marca             @relation(fields: [Marca_id_Marca], references: [id_Marca])
+  Almacenamiento_id_Almacenamiento Int?        @map("Almacenamiento_id_Almacenamiento")
+  Almacenamiento             Almacenamiento?   @relation(fields: [Almacenamiento_id_Almacenamiento], references: [id_Almacenamiento])
+  unidades                   UnidadInventario[]
+  notificaciones             Notificacion[]
+  @@map("Producto")
+}
+
+model UnidadInventario {
+  id_UnidadInventario        Int               @id @default(autoincrement()) @map("id_UnidadInventario")
+  Imei_1                     String            @unique @map("Imei_1")
+  Imei_2                     String?           @map("Imei_2")
+  estado                     String            @default("DISPONIBLE")
+  Producto_id_Producto       Int               @map("Producto_id_Producto")
+  Producto                   Producto          @relation(fields: [Producto_id_Producto], references: [id_Producto])
+  detalles                   DetalleMovimiento[]
+  @@map("UnidadInventario")
+}
+
+model Notificacion {
+  id_Notificacion            Int               @id @default(autoincrement()) @map("id_Notificacion")
+  Producto_id_Producto       Int               @map("Producto_id_Producto")
+  Producto                   Producto          @relation(fields: [Producto_id_Producto], references: [id_Producto])
+  mensaje                    String
+  leida                      Boolean           @default(false) @map("leida")
+  fecha_creacion             DateTime          @default(now()) @map("fecha_creacion")
+  color                      String?           // <--- CAMBIO APLICADO AQUÍ
+  @@map("Notificacion")
+}
+
+model Proveedor {
+  id_Proveedor               Int               @id @default(autoincrement()) @map("id_Proveedor")
+  nombre                     String
+  telefono                   String?
+  movimientos                MovimientoStock[]
+  @@map("Proveedor")
+}
+
+model Cliente {
+  id_Cliente                 Int               @id @default(autoincrement()) @map("id_Cliente")
+  nombre                     String
+  apellido                   String?
+  telefono                   String?
+  cedula                     String            @unique
+  movimientos                MovimientoStock[]
+  @@map("Cliente")
+}
+
+model MovimientoStock {
+  id_MovimientoStock         Int               @id @default(autoincrement()) @map("id_MovimientoStock")
+  tipo                       String
+  fecha_hora                 DateTime          @default(now()) @map("fecha_hora")
+  Proveedor_id_Proveedor     Int?              @map("Proveedor_id_Proveedor")
+  Proveedor                  Proveedor?        @relation(fields: [Proveedor_id_Proveedor], references: [id_Proveedor])
+  Cliente_id_Cliente         Int?              @map("Cliente_id_Cliente")
+  Cliente                    Cliente?          @relation(fields: [Cliente_id_Cliente], references: [id_Cliente])
+  detalles                   DetalleMovimiento[]
+  @@map("MovimientoStock")
+}
+
+model DetalleMovimiento {
+  UnidadInventario_id_UnidadInventario Int     @map("UnidadInventario_id_UnidadInventario")
+  MovimientoStock_id_MovimientoStock    Int     @map("MovimientoStock_id_MovimientoStock")
+  UnidadInventario                     UnidadInventario @relation(fields: [UnidadInventario_id_UnidadInventario], references: [id_UnidadInventario])
+  MovimientoStock                      MovimientoStock  @relation(fields: [MovimientoStock_id_MovimientoStock], references: [id_MovimientoStock])
+
+  @@id([UnidadInventario_id_UnidadInventario, MovimientoStock_id_MovimientoStock])
+  @@map("DetalleMovimiento")
+}
