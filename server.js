@@ -142,39 +142,46 @@ app.delete('/api/productos/:id', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'No se pudo eliminar' }); }
 });
 
-// --- 5.5 ELIMINAR PRODUCTOS EN LOTE (VERSIÓN TOLERANTE A FALLOS) ---
+// --- 5.5 ELIMINAR PRODUCTOS EN LOTE (100% A PRUEBA DE BALAS) ---
 app.post('/api/productos/batch-delete', async (req, res) => {
   const { ids } = req.body;
   try {
     await prisma.$transaction(async (prisma) => {
       for (const id of ids) {
-        // 1. Verificar si el producto aún existe antes de intentar borrarlo
-        const productoExiste = await prisma.producto.findUnique({
-          where: { id_Producto: parseInt(id) }
-        });
+        try {
+          // Validación: Si el ID no es un número válido, lo saltamos
+          const productId = parseInt(id);
+          if (isNaN(productId)) {
+            console.log(`⚠️ ID inválido (NaN) recibido: ${id}. Saltando...`);
+            continue;
+          }
 
-        // Si el producto ya no existe, lo saltamos y seguimos con el siguiente
-        if (!productoExiste) {
-          console.log(`⚠️ El producto ID ${id} ya no existe. Saltando...`);
-          continue;
-        }
-
-        // 2. Buscar las unidades (IMEIs) de este producto
-        const unidades = await prisma.unidadInventario.findMany({
-          where: { Producto_id_Producto: parseInt(id) },
-          select: { id_UnidadInventario: true }
-        });
-        const idsUnidades = unidades.map(u => u.id_UnidadInventario);
-        
-        // 3. Si tiene unidades, eliminar sus detalles de movimiento (historial)
-        if (idsUnidades.length > 0) {
-          await prisma.detalleMovimiento.deleteMany({
-            where: { UnidadInventario_id_UnidadInventario: { in: idsUnidades } }
+          // 1. Buscar las unidades (IMEIs) de este producto
+          const unidades = await prisma.unidadInventario.findMany({
+            where: { Producto_id_Producto: productId },
+            select: { id_UnidadInventario: true }
           });
-        }
+          const idsUnidades = unidades.map(u => u.id_UnidadInventario);
+          
+          // 2. Eliminar el historial (DetalleMovimiento)
+          if (idsUnidades.length > 0) {
+            await prisma.detalleMovimiento.deleteMany({
+              where: { UnidadInventario_id_UnidadInventario: { in: idsUnidades } }
+            });
+          }
 
-        // 4. Finalmente, eliminar el producto
-        await prisma.producto.delete({ where: { id_Producto: parseInt(id) } });
+          // 3. Intentar eliminar el producto
+          await prisma.producto.delete({ where: { id_Producto: productId } });
+
+        } catch (innerErr) {
+          // Si el error es porque el producto ya fue eliminado (código P2025), lo ignoramos.
+          // Si es cualquier otro error, detenemos la transacción.
+          if (innerErr.code === 'P2025') {
+            console.log(`⚠️ Producto ID ${id} ya estaba eliminado. Saltando...`);
+            continue;
+          }
+          throw innerErr;
+        }
       }
     });
     res.json({ message: 'Modelo eliminado exitosamente' });
