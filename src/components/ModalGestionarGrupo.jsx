@@ -17,7 +17,7 @@ export default function ModalGestionarGrupo({ grupo, onClose, onSave }) {
       title: `IMEI: ${imei.imei_1}`,
       subtitle: `Unidad individual de ${grupo.nombreModelo}`,
       action: async () => {
-        await axios.delete(`http://localhost:5000/api/unidades/${imei.id}`);
+        await axios.delete(`${import.meta.env.VITE_API_URL}/api/unidades/${imei.id}`);
       }
     });
     setStep('confirm');
@@ -29,7 +29,7 @@ export default function ModalGestionarGrupo({ grupo, onClose, onSave }) {
       title: `Proveedor "${providerName}"`,
       subtitle: `Todos los IMEIs de ${colorName} para este proveedor (${ids.length} unidades)`,
       action: async () => {
-        await axios.delete(`http://localhost:5000/api/variantes`, { data: { ids } });
+        await axios.delete(`${import.meta.env.VITE_API_URL}/api/variantes`, { data: { ids } });
       }
     });
     setStep('confirm');
@@ -41,7 +41,7 @@ export default function ModalGestionarGrupo({ grupo, onClose, onSave }) {
       title: `Color "${colorName}"`,
       subtitle: `Todos los proveedores e IMEIs de este color (${ids.length} unidades)`,
       action: async () => {
-        await axios.delete(`http://localhost:5000/api/variantes`, { data: { ids } });
+        await axios.delete(`${import.meta.env.VITE_API_URL}/api/variantes`, { data: { ids } });
       }
     });
     setStep('confirm');
@@ -54,7 +54,7 @@ export default function ModalGestionarGrupo({ grupo, onClose, onSave }) {
       title: `${grupo.nombreModelo}`,
       subtitle: `Todas las variantes, colores, proveedores e IMEIs asociados.`,
       action: async () => {
-        await axios.post(`http://localhost:5000/api/productos/batch-delete`, { 
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/productos/batch-delete`, { 
           ids: grupo.ids 
         });
       }

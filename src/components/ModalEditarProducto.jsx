@@ -25,7 +25,7 @@ export default function ModalEditarProducto({ grupo, catalogos, onClose, onSave 
   const [imeiEdit, setImeiEdit] = useState({ imei_1: '', imei_2: '' });
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/proveedores').then(res => setProveedores(res.data));
+    axios.get(`${import.meta.env.VITE_API_URL}/api/proveedores`).then(res => setProveedores(res.data));
   }, []);
 
   // --- Paso 1: Seleccionar Variante ---
@@ -94,7 +94,7 @@ export default function ModalEditarProducto({ grupo, catalogos, onClose, onSave 
           form.almacenamientoId !== grupo.almacenamientoId;
 
         if (coreChanged) {
-          const res = await axios.post('http://localhost:5000/api/productos', {
+          const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/productos`, {
             nombre: form.nombre,
             modelo: form.modelo,
             Marca_id_Marca: grupo.marcaId,
@@ -107,25 +107,25 @@ export default function ModalEditarProducto({ grupo, catalogos, onClose, onSave 
           });
           const nuevoProductoId = res.data.id_Producto;
 
-          await axios.patch(`http://localhost:5000/api/unidades/mover`, {
+          await axios.patch(`${import.meta.env.VITE_API_URL}/api/unidades/mover`, {
             unidadIds: idsViejos,
             nuevoProductoId: nuevoProductoId
           });
 
           if (form.proveedorId && form.proveedorId !== selectedVariant.proveedorId) {
-            await axios.patch(`http://localhost:5000/api/variantes/proveedor`, {
+            await axios.patch(`${import.meta.env.VITE_API_URL}/api/variantes/proveedor`, {
               unidadIds: idsViejos,
               proveedorId: parseInt(form.proveedorId)
             });
           }
         } else {
           if (form.colorId && form.colorId !== selectedVariant.colorId) {
-            await axios.patch(`http://localhost:5000/api/productos/${targetProductId}`, {
+            await axios.patch(`${import.meta.env.VITE_API_URL}/api/productos/${targetProductId}`, {
               Color_id_Color: parseInt(form.colorId)
             });
           }
           if (form.proveedorId && form.proveedorId !== selectedVariant.proveedorId) {
-            await axios.patch(`http://localhost:5000/api/variantes/proveedor`, {
+            await axios.patch(`${import.meta.env.VITE_API_URL}/api/variantes/proveedor`, {
               unidadIds: idsViejos,
               proveedorId: parseInt(form.proveedorId)
             });
@@ -154,7 +154,7 @@ export default function ModalEditarProducto({ grupo, catalogos, onClose, onSave 
         // SI CAMBIA RAM, ALMACENAMIENTO, NOMBRE O MODELO -> DEBE CREAR UN PRODUCTO NUEVO Y MOVER SOLO ESE IMEI
         if (coreChanged || colorChanged || providerChanged) {
           // Crear producto nuevo sin IMEIs
-          const res = await axios.post('http://localhost:5000/api/productos', {
+          const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/productos`, {
             nombre: form.nombre,
             modelo: form.modelo,
             Marca_id_Marca: grupo.marcaId,
@@ -168,21 +168,21 @@ export default function ModalEditarProducto({ grupo, catalogos, onClose, onSave 
           const nuevoProductoId = res.data.id_Producto;
 
           // Mover SOLO este IMEI específico al nuevo producto
-          await axios.patch(`http://localhost:5000/api/unidades/mover`, {
+          await axios.patch(`${import.meta.env.VITE_API_URL}/api/unidades/mover`, {
             unidadIds: [selectedImei.id],
             nuevoProductoId: nuevoProductoId
           });
 
           // Actualizar el número de IMEI del nuevo producto si cambió
           if (imeiChanged) {
-            await axios.patch(`http://localhost:5000/api/productos/${nuevoProductoId}`, {
+            await axios.patch(`${import.meta.env.VITE_API_URL}/api/productos/${nuevoProductoId}`, {
               unidades: [{ id: selectedImei.id, imei_1: imeiEdit.imei_1, imei_2: imeiEdit.imei_2 || null }]
             });
           }
         } 
         // SI SOLO CAMBIÓ EL NÚMERO DE IMEI (pero no los atributos base)
         else if (imeiChanged) {
-          await axios.patch(`http://localhost:5000/api/productos/${targetProductId}`, {
+          await axios.patch(`${import.meta.env.VITE_API_URL}/api/productos/${targetProductId}`, {
             unidades: [{ id: selectedImei.id, imei_1: imeiEdit.imei_1, imei_2: imeiEdit.imei_2 || null }]
           });
         }

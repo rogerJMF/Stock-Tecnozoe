@@ -10,8 +10,8 @@ export default function Agotados() {
   const fetchData = async () => {
     try {
       const [prodRes, catRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/productos'),
-        axios.get('http://localhost:5000/api/catalogos')
+        axios.get(`${import.meta.env.VITE_API_URL}/api/productos`),
+        axios.get(`${import.meta.env.VITE_API_URL}/api/catalogos`)
       ]);
       setProductos(prodRes.data);
       setCatalogos(catRes.data);
