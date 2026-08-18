@@ -21,7 +21,7 @@ export default function ModalAgregarProducto({ onClose, catalogos, onSave }) {
 
   // Cargar proveedores al abrir el modal
   useEffect(() => {
-    axios.get('http://localhost:5000/api/proveedores').then(res => setProveedores(res.data));
+    axios.get(`${import.meta.env.VITE_API_URL}/api/proveedores`).then(res => setProveedores(res.data));
   }, []);
 
   const handleSubmit = async (e) => {
@@ -44,16 +44,19 @@ export default function ModalAgregarProducto({ onClose, catalogos, onSave }) {
     let proveedorId = form.Proveedor_id_Proveedor;
     if (form.nuevoProveedor.trim() !== '' && proveedorId === '') {
       try {
-        const res = await axios.post('http://localhost:5000/api/proveedores', { nombre: form.nuevoProveedor });
+        // CORRECCIÓN: Usamos la variable de entorno para la URL
+        const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/proveedores`, { nombre: form.nuevoProveedor });
         proveedorId = res.data.id_Proveedor;
+        // Actualizar la lista de proveedores localmente para que se vea reflejado
+        setProveedores(prev => [...prev, res.data]);
       } catch (err) {
-        alert('Error al crear el nuevo proveedor.');
+        alert('Error al crear el nuevo proveedor: ' + (err.response?.data?.error || err.message));
         setIsLoading(false);
         return;
       }
     }
 
-    // 3. Procesar los IMEIs (Texto a Array)
+    // 3. Procesar los IMEIs
     const lineas = form.imeisTexto.split('\n').filter(linea => linea.trim() !== '');
     if (lineas.length === 0) {
       alert('Debes escribir al menos un IMEI.');
@@ -67,7 +70,7 @@ export default function ModalAgregarProducto({ onClose, catalogos, onSave }) {
 
     // 4. Enviar al servidor
     try {
-      await axios.post('http://localhost:5000/api/productos', { ...form, unidades, Proveedor_id_Proveedor: proveedorId });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/productos`, { ...form, unidades, Proveedor_id_Proveedor: proveedorId });
       onSave();
       onClose();
     } catch (err) {
@@ -217,7 +220,7 @@ export default function ModalAgregarProducto({ onClose, catalogos, onSave }) {
             </div>
           </div>
 
-          {/* Botones de acción (Footer) */}
+          {/* Botones de acción */}
           <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-white/10 sticky bottom-0 bg-slate-800/90 backdrop-blur-xl pb-1">
             <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-700 rounded-xl hover:bg-slate-600 transition-all">Cancelar</button>
             <button 
