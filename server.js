@@ -52,7 +52,7 @@ app.post('/api/proveedores', async (req, res) => {
   res.json(nuevo);
 });
 
-// --- 3. PRODUCTOS (GET) ---
+// --- 3. PRODUCTOS (GET - NUEVA LÓGICA PARA DETECTAR VENTAS) ---
 app.get('/api/productos', async (req, res) => {
   const productos = await prisma.producto.findMany({
     include: {
@@ -73,12 +73,38 @@ app.get('/api/productos', async (req, res) => {
     }
   });
 
+  // 1. Obtener los IDs de todos los productos
+  const productoIds = productos.map(p => p.id_Producto);
+  
+  // 2. Buscar IMEIs que tengan al menos una venta (SALIDA)
+  const ventasUnidades = await prisma.detalleMovimiento.findMany({
+    where: {
+      MovimientoStock: { tipo: 'SALIDA' },
+      UnidadInventario: { Producto_id_Producto: { in: productoIds } }
+    },
+    select: { UnidadInventario_id_UnidadInventario: true },
+    distinct: ['UnidadInventario_id_UnidadInventario']
+  });
+  const imeisConVentas = ventasUnidades.map(u => u.UnidadInventario_id_UnidadInventario);
+  
+  // 3. Obtener los productos asociados a esos IMEIs vendidos
+  let productoIdsConVentas = new Set();
+  if (imeisConVentas.length > 0) {
+    const unidadesConVentas = await prisma.unidadInventario.findMany({
+      where: { id_UnidadInventario: { in: imeisConVentas } },
+      select: { Producto_id_Producto: true }
+    });
+    productoIdsConVentas = new Set(unidadesConVentas.map(u => u.Producto_id_Producto));
+  }
+
+  // 4. Armar la respuesta final con el flag tieneVentas
   const productosConStock = productos.map(p => ({
     ...p,
     stock_actual: p.unidades.length,
     proveedor: p.unidades.length > 0 && p.unidades[0].detalles.length > 0 
                ? p.unidades[0].detalles[0].MovimientoStock?.Proveedor 
-               : null
+               : null,
+    tieneVentas: productoIdsConVentas.has(p.id_Producto)
   }));
   res.json(productosConStock);
 });
@@ -157,7 +183,6 @@ app.post('/api/productos/batch-delete', async (req, res) => {
       }
 
       try {
-        // Verificar si existe antes de hacer nada
         const existe = await prisma.producto.findUnique({
           where: { id_Producto: productId }
         });
@@ -167,7 +192,6 @@ app.post('/api/productos/batch-delete', async (req, res) => {
           continue;
         }
 
-        // 1. Borrar el historial (DetalleMovimiento)
         const unidades = await prisma.unidadInventario.findMany({
           where: { Producto_id_Producto: productId },
           select: { id_UnidadInventario: true }
@@ -180,14 +204,12 @@ app.post('/api/productos/batch-delete', async (req, res) => {
           });
         }
 
-        // 2. Borrar las Unidades de Inventario (IMEIs)
         if (idsUnidades.length > 0) {
           await prisma.unidadInventario.deleteMany({
             where: { id_UnidadInventario: { in: idsUnidades } }
           });
         }
 
-        // 3. Borrar el Producto
         await prisma.producto.delete({ where: { id_Producto: productId } });
         eliminados++;
 
