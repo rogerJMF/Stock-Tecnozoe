@@ -47,7 +47,6 @@ export default function ModalGestionarGrupo({ grupo, onClose, onSave }) {
     setStep('confirm');
   };
 
-  // --- CORRECCIÓN AQUÍ (Usa el nuevo endpoint seguro) ---
   const prepareDeleteAll = () => {
     setDeleteTarget({
       type: 'Modelo Completo',
@@ -143,13 +142,18 @@ export default function ModalGestionarGrupo({ grupo, onClose, onSave }) {
                             </button>
                           </div>
 
-                          {/* Lista de IMEIs individuales */}
+                          {/* 📌 CORRECCIÓN AQUÍ: Mostramos ambos IMEIs */}
                           <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
                             {prov.imeis.map((imei, ji) => (
                               <div key={ji} className="flex justify-between items-center bg-black/40 p-1.5 px-2 rounded-lg border border-white/5 hover:border-red-500/30 transition-colors group/imei">
-                                <span className="font-mono text-xs text-slate-300 group-hover/imei:text-white transition-colors">
-                                  {imei.imei_1}
-                                </span>
+                                <div className="flex flex-col font-mono text-xs text-slate-300 group-hover/imei:text-white transition-colors">
+                                  <span>IMEI 1: {imei.imei_1}</span>
+                                  {imei.imei_2 && (
+                                    <span className="text-slate-400 group-hover/imei:text-slate-200 transition-colors text-[10px] mt-0.5">
+                                      IMEI 2: {imei.imei_2}
+                                    </span>
+                                  )}
+                                </div>
                                 <button 
                                   onClick={() => prepareDeleteImei(imei)}
                                   className="opacity-0 group-hover/imei:opacity-100 text-[10px] text-red-400 hover:text-red-300 underline transition-all"
