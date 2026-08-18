@@ -9,7 +9,7 @@ export default function Compras() {
 
   const fetchMovimientos = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/movimientos');
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/movimientos`);
       setMovimientos(res.data);
     } catch (e) {}
   };
@@ -123,29 +123,25 @@ export default function Compras() {
                 whileHover={{ y: -8, boxShadow: "0 15px 40px rgba(59, 130, 246, 0.15)" }}
                 className="bg-slate-800/60 backdrop-blur-sm border border-white/10 rounded-2xl p-6 shadow-xl relative overflow-hidden group hover:border-blue-500/30 transition-all duration-300"
               >
-                {/* Brillo decorativo en hover */}
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
                 <div className="relative z-10 flex flex-col h-full justify-between gap-2">
-                  {/* Parte superior: Producto y Marca */}
-                  <div className="flex justify-between items-start gap-2">
-                    <h3 className="text-lg font-bold text-white tracking-tight truncate group-hover:text-blue-300 transition-colors">
-                      {v.producto}
-                    </h3>
-                    <span className="bg-slate-700/80 border border-white/10 text-slate-300 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold shrink-0 group-hover:bg-blue-900/50 group-hover:text-blue-300 group-hover:border-blue-500/30 transition-all">
-                      {v.marca}
-                    </span>
-                  </div>
-
-                  {/* Parte media: IMEI y Proveedor */}
-                  <div className="flex flex-col gap-1 mt-2">
-                    <div className="flex items-center gap-2 bg-black/30 p-2 rounded-xl border border-white/5 group-hover:border-blue-500/20 transition-colors">
-                      <Smartphone className="w-4 h-4 text-purple-400 shrink-0" />
-                      <span className="font-mono text-xs text-slate-300 truncate">{v.imei}</span>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between items-start gap-2">
+                      <h3 className="text-lg font-bold text-white tracking-tight truncate group-hover:text-blue-300 transition-colors">
+                        {v.producto}
+                      </h3>
+                      <span className="bg-slate-700/80 border border-white/10 text-slate-300 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold shrink-0 group-hover:bg-blue-900/50 group-hover:text-blue-300 group-hover:border-blue-500/30 transition-all">
+                        {v.marca}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Parte inferior: Fecha y Proveedor */}
+                  <div className="flex items-center gap-2 bg-black/30 p-2 rounded-xl border border-white/5 group-hover:border-blue-500/20 transition-colors mt-1">
+                    <Smartphone className="w-4 h-4 text-purple-400 shrink-0" />
+                    <span className="font-mono text-xs text-slate-300 truncate">{v.imei}</span>
+                  </div>
+
                   <div className="mt-3 pt-3 border-t border-white/5 flex justify-between items-center text-xs text-slate-400">
                     <div className="flex items-center gap-1.5 truncate max-w-[50%]">
                       <User className="w-3 h-3 text-blue-400/70" />

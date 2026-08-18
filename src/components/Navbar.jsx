@@ -12,7 +12,7 @@ export default function Navbar() {
 
   const fetchNotis = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/notificaciones');
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/notificaciones`);
       setNotificaciones(res.data);
       console.log("Notificaciones: ", res)
     } catch (e) {
@@ -41,7 +41,7 @@ export default function Navbar() {
 
   const marcarLeida = async (id) => {
     try {
-      await axios.patch(`http://localhost:5000/api/notificaciones/${id}`);
+      await axios.patch(`${import.meta.env.VITE_API_URL}/api/notificaciones/${id}`);
       setNotificaciones(prev => prev.filter(n => n.id_Notificacion !== id));
     } catch (e) {
       console.error("❌ Error marcando notificación como leída:", e);
@@ -51,7 +51,7 @@ export default function Navbar() {
   const marcarTodasLeidas = async () => {
     try {
       const ids = notificaciones.map(n => n.id_Notificacion);
-      await Promise.all(ids.map(id => axios.patch(`http://localhost:5000/api/notificaciones/${id}`)));
+      await Promise.all(ids.map(id => axios.patch(`${import.meta.env.VITE_API_URL}/api/notificaciones/${id}`)));
       setNotificaciones([]);
     } catch (e) {
       console.error("Error al marcar todas como leídas:", e);

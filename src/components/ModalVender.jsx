@@ -12,7 +12,7 @@ export default function ModalVender({ onClose, onSave }) {
 
   // Cargar todos los productos disponibles al abrir el modal
   useEffect(() => {
-    axios.get('http://localhost:5000/api/productos').then(res => {
+    axios.get(`${import.meta.env.VITE_API_URL}/api/productos`).then(res => {
       setProducts(res.data);
     });
   }, []);
@@ -69,7 +69,7 @@ export default function ModalVender({ onClose, onSave }) {
     if (!clientData.nombre.trim()) return alert('El nombre del cliente es obligatorio.');
 
     try {
-      await axios.post('http://localhost:5000/api/ventas', {
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/ventas`, {
         unidadInventarioId: selectedUnit.id,
         nombreCliente: clientData.nombre,
         cedulaCliente: clientData.cedula,

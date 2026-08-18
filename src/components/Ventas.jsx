@@ -9,7 +9,7 @@ export default function Ventas() {
 
   const fetchMovimientos = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/movimientos');
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/movimientos`);
       setMovimientos(res.data);
     } catch (e) {}
   };
