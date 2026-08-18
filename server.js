@@ -142,51 +142,72 @@ app.delete('/api/productos/:id', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'No se pudo eliminar' }); }
 });
 
-// --- 5.5 ELIMINAR PRODUCTOS EN LOTE (100% A PRUEBA DE BALAS) ---
+// --- 5.5 ELIMINAR PRODUCTOS EN LOTE (ELIMINACIÓN POR BUCLE ROBUSTO) ---
 app.post('/api/productos/batch-delete', async (req, res) => {
   const { ids } = req.body;
   try {
-    await prisma.$transaction(async (prisma) => {
-      for (const id of ids) {
-        try {
-          // Validación: Si el ID no es un número válido, lo saltamos
-          const productId = parseInt(id);
-          if (isNaN(productId)) {
-            console.log(`⚠️ ID inválido (NaN) recibido: ${id}. Saltando...`);
-            continue;
-          }
+    let eliminados = 0;
+    let errores = [];
 
-          // 1. Buscar las unidades (IMEIs) de este producto
-          const unidades = await prisma.unidadInventario.findMany({
-            where: { Producto_id_Producto: productId },
-            select: { id_UnidadInventario: true }
-          });
-          const idsUnidades = unidades.map(u => u.id_UnidadInventario);
-          
-          // 2. Eliminar el historial (DetalleMovimiento)
-          if (idsUnidades.length > 0) {
-            await prisma.detalleMovimiento.deleteMany({
-              where: { UnidadInventario_id_UnidadInventario: { in: idsUnidades } }
-            });
-          }
-
-          // 3. Intentar eliminar el producto
-          await prisma.producto.delete({ where: { id_Producto: productId } });
-
-        } catch (innerErr) {
-          // Si el error es porque el producto ya fue eliminado (código P2025), lo ignoramos.
-          // Si es cualquier otro error, detenemos la transacción.
-          if (innerErr.code === 'P2025') {
-            console.log(`⚠️ Producto ID ${id} ya estaba eliminado. Saltando...`);
-            continue;
-          }
-          throw innerErr;
-        }
+    for (const id of ids) {
+      const productId = parseInt(id);
+      if (isNaN(productId)) {
+        errores.push({ id, reason: 'ID inválido' });
+        continue;
       }
+
+      try {
+        // Verificar si existe antes de hacer nada
+        const existe = await prisma.producto.findUnique({
+          where: { id_Producto: productId }
+        });
+
+        if (!existe) {
+          errores.push({ id: productId, reason: 'Ya fue eliminado anteriormente' });
+          continue;
+        }
+
+        // 1. Borrar el historial (DetalleMovimiento)
+        const unidades = await prisma.unidadInventario.findMany({
+          where: { Producto_id_Producto: productId },
+          select: { id_UnidadInventario: true }
+        });
+        const idsUnidades = unidades.map(u => u.id_UnidadInventario);
+
+        if (idsUnidades.length > 0) {
+          await prisma.detalleMovimiento.deleteMany({
+            where: { UnidadInventario_id_UnidadInventario: { in: idsUnidades } }
+          });
+        }
+
+        // 2. Borrar las Unidades de Inventario (IMEIs)
+        if (idsUnidades.length > 0) {
+          await prisma.unidadInventario.deleteMany({
+            where: { id_UnidadInventario: { in: idsUnidades } }
+          });
+        }
+
+        // 3. Borrar el Producto
+        await prisma.producto.delete({ where: { id_Producto: productId } });
+        eliminados++;
+
+      } catch (innerError) {
+        console.error(`❌ Error eliminando producto ID ${productId}:`, innerError);
+        errores.push({ id: productId, reason: innerError.message });
+      }
+    }
+
+    if (eliminados === 0 && errores.length > 0) {
+      return res.status(500).json({ message: 'No se pudo eliminar ningún producto', errores });
+    }
+
+    res.json({ 
+      message: `Procesados ${ids.length}. Eliminados exitosamente: ${eliminados}.`,
+      errores 
     });
-    res.json({ message: 'Modelo eliminado exitosamente' });
+
   } catch (error) {
-    console.error("❌ ERROR REAL EN EL SERVIDOR:", error);
+    console.error("❌ ERROR FATAL EN EL ENDPOINT BATCH-DELETE:", error);
     res.status(500).json({ error: 'No se pudo eliminar el modelo' });
   }
 });
@@ -315,7 +336,6 @@ app.post('/api/ventas', async (req, res) => {
 // --- 10. HISTORIAL Y BÚSQUEDA ---
 app.get('/api/movimientos', async (req, res) => {
   try {
-    // 1. Primero obtenemos los movimientos con toda la data básica
     const movimientos = await prisma.movimientoStock.findMany({
       include: {
         Proveedor: true,
@@ -340,31 +360,22 @@ app.get('/api/movimientos', async (req, res) => {
       orderBy: { fecha_hora: 'desc' }
     });
 
-    // 2. Optimización: En lugar de hacer una consulta por cada IMEI, buscamos TODOS los orígenes de una sola vez
-    // (Esto evita que el servidor se sobrecargue y deje de traer los colores y RAM)
     const allIds = movimientos.flatMap(m => m.detalles.map(d => d.UnidadInventario_id_UnidadInventario));
-    
-    // Obtenemos el movimiento de entrada más antiguo para cada IMEI
     const entradas = await prisma.detalleMovimiento.groupBy({
       by: ['UnidadInventario_id_UnidadInventario'],
       where: { UnidadInventario_id_UnidadInventario: { in: allIds } },
-      _min: { MovimientoStock_id_MovimientoStock: true } // Tomamos el ID del movimiento más antiguo
+      _min: { MovimientoStock_id_MovimientoStock: true }
     });
-
-    // Obtenemos los detalles completos de esas entradas
     const entradaIds = entradas.map(e => e._min.MovimientoStock_id_MovimientoStock).filter(id => id !== null);
     const detallesEntrada = await prisma.detalleMovimiento.findMany({
       where: { MovimientoStock_id_MovimientoStock: { in: entradaIds } },
       include: { MovimientoStock: { include: { Proveedor: true } } }
     });
-
-    // Creamos un mapa rápido: IMEI ID -> Proveedor
     const mapaProveedores = new Map();
     detallesEntrada.forEach(det => {
       mapaProveedores.set(det.UnidadInventario_id_UnidadInventario, det.MovimientoStock?.Proveedor);
     });
 
-    // 3. Armamos la respuesta final con los datos enriquecidos
     const movimientosEnriquecidos = movimientos.map(mov => ({
       ...mov,
       detalles: mov.detalles.map(det => ({
