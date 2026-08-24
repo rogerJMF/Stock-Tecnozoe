@@ -38,7 +38,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Lógica de agrupación (Sin cambios)
+  // Lógica de agrupación 
   const datosAgrupados = {};
   productos.forEach(p => {
     const marcaOriginal = p.Marca?.nombre || 'Sin Marca';

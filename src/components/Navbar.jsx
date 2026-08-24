@@ -10,8 +10,7 @@ export default function Navbar() {
   const [showNotis, setShowNotis] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Aquí va la URL de tu logo. Usé una imagen de ejemplo. MIRA LA NOTA AL FINAL.
-  const LOGO_URL = "/Logo.png"; // Cambia esto por tu imagen real
+  const LOGO_URL = "/Logo.png"; 
 
   const fetchNotis = async () => {
     try {
