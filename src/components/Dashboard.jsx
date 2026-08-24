@@ -3,7 +3,7 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Package, Smartphone, Tag, Search, Eye, Edit, Trash2, Plus, ShoppingBag, 
-  X, Palette, Truck, ChevronDown, ChevronUp, List, LayoutGrid, Filter, TrendingUp, Boxes
+  X, Palette, Truck, ChevronDown, ChevronUp, List, LayoutGrid, TrendingUp, Boxes
 } from 'lucide-react';
 import ModalAgregarProducto from './ModalAgregarProducto';
 import ModalVender from './ModalVender';
@@ -13,7 +13,9 @@ import ModalEditarProducto from './ModalEditarProducto';
 export default function Dashboard() {
   const [productos, setProductos] = useState([]);
   const [catalogos, setCatalogos] = useState({ marcas: [], colores: [], rams: [], almacenamientos: [] });
+  const [movements, setMovements] = useState([]); // <--- NUEVO ESTADO PARA MOVIMIENTOS
   const [searchTerm, setSearchTerm] = useState('');
+
   const [showAgregar, setShowAgregar] = useState(false);
   const [showVender, setShowVender] = useState(false);
   const [grupoGestionar, setGrupoGestionar] = useState(null);
@@ -23,12 +25,15 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [prodRes, catRes] = await Promise.all([
+      // Agregamos la petición de movimientos al Promise.all
+      const [prodRes, catRes, movRes] = await Promise.all([
         axios.get(`${import.meta.env.VITE_API_URL}/api/productos`),
-        axios.get(`${import.meta.env.VITE_API_URL}/api/catalogos`)
+        axios.get(`${import.meta.env.VITE_API_URL}/api/catalogos`),
+        axios.get(`${import.meta.env.VITE_API_URL}/api/movimientos`)
       ]);
       setProductos(prodRes.data);
       setCatalogos(catRes.data);
+      setMovements(movRes.data); // Guardamos los movimientos
     } catch (e) { console.error("Error cargando datos", e); }
   };
 
@@ -38,7 +43,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Lógica de agrupación 
+  // --- Lógica de Agrupación (Sin cambios) ---
   const datosAgrupados = {};
   productos.forEach(p => {
     const marcaOriginal = p.Marca?.nombre || 'Sin Marca';
@@ -96,10 +101,12 @@ export default function Dashboard() {
     });
   });
 
+  // --- Cálculo de Estadísticas Globales (CON MOVIMIENTOS) ---
   const stats = useMemo(() => {
     let totalStock = 0;
     let totalModelos = 0;
     let totalMarcasActivas = 0;
+
     Object.entries(datosAgrupados).forEach(([marcaKey, marcaData]) => {
       let marcaTieneStock = false;
       Object.values(marcaData.modelos).forEach(grupo => {
@@ -111,14 +118,24 @@ export default function Dashboard() {
       });
       if (marcaTieneStock) totalMarcasActivas += 1;
     });
+
+    // Contamos el total de movimientos y los de hoy
+    const totalMovimientos = movements.length;
+    const hoy = new Date().toDateString();
+    const movimientosHoy = movements.filter(m => 
+      new Date(m.fecha_hora).toDateString() === hoy
+    ).length;
+
     return {
       totalStock,
       totalBrands: totalMarcasActivas,
-      totalModels: totalModelos
+      totalModels: totalModelos,
+      totalMovimientos,
+      movimientosHoy
     };
-  }, [datosAgrupados]);
+  }, [datosAgrupados, movements]); // <--- Dependencia agregada
 
-  // Búsqueda
+  // --- Filtro de Búsqueda ---
   const marcasFiltradas = useMemo(() => {
     if (!searchTerm.trim()) return Object.keys(datosAgrupados).sort();
     const lowerSearch = searchTerm.toLowerCase().trim();
@@ -198,7 +215,9 @@ export default function Dashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-xs text-slate-400 uppercase tracking-wider">Movimientos</p>
-              <p className="text-4xl font-bold mt-1 text-blue-300">0</p>
+              {/* Aquí ahora se muestra el total y los de hoy */}
+              <p className="text-4xl font-bold mt-1 text-blue-300">{stats.totalMovimientos}</p>
+              <p className="text-xs text-slate-500 mt-1">Hoy: {stats.movimientosHoy}</p>
             </div>
             <div className="p-3 bg-blue-500/10 rounded-xl text-blue-400"><TrendingUp className="w-5 h-5" /></div>
           </div>
