@@ -52,7 +52,7 @@ app.post('/api/proveedores', async (req, res) => {
   res.json(nuevo);
 });
 
-// --- 3. PRODUCTOS (GET - NUEVA LÓGICA PARA DETECTAR VENTAS) ---
+// --- 3. PRODUCTOS (GET) ---
 app.get('/api/productos', async (req, res) => {
   const productos = await prisma.producto.findMany({
     include: {
@@ -73,38 +73,12 @@ app.get('/api/productos', async (req, res) => {
     }
   });
 
-  // 1. Obtener los IDs de todos los productos
-  const productoIds = productos.map(p => p.id_Producto);
-  
-  // 2. Buscar IMEIs que tengan al menos una venta (SALIDA)
-  const ventasUnidades = await prisma.detalleMovimiento.findMany({
-    where: {
-      MovimientoStock: { tipo: 'SALIDA' },
-      UnidadInventario: { Producto_id_Producto: { in: productoIds } }
-    },
-    select: { UnidadInventario_id_UnidadInventario: true },
-    distinct: ['UnidadInventario_id_UnidadInventario']
-  });
-  const imeisConVentas = ventasUnidades.map(u => u.UnidadInventario_id_UnidadInventario);
-  
-  // 3. Obtener los productos asociados a esos IMEIs vendidos
-  let productoIdsConVentas = new Set();
-  if (imeisConVentas.length > 0) {
-    const unidadesConVentas = await prisma.unidadInventario.findMany({
-      where: { id_UnidadInventario: { in: imeisConVentas } },
-      select: { Producto_id_Producto: true }
-    });
-    productoIdsConVentas = new Set(unidadesConVentas.map(u => u.Producto_id_Producto));
-  }
-
-  // 4. Armar la respuesta final con el flag tieneVentas
   const productosConStock = productos.map(p => ({
     ...p,
     stock_actual: p.unidades.length,
     proveedor: p.unidades.length > 0 && p.unidades[0].detalles.length > 0 
                ? p.unidades[0].detalles[0].MovimientoStock?.Proveedor 
-               : null,
-    tieneVentas: productoIdsConVentas.has(p.id_Producto)
+               : null
   }));
   res.json(productosConStock);
 });
@@ -168,7 +142,7 @@ app.delete('/api/productos/:id', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'No se pudo eliminar' }); }
 });
 
-// --- 5.5 ELIMINAR PRODUCTOS EN LOTE (ELIMINACIÓN POR BUCLE ROBUSTO) ---
+// --- 5.5 ELIMINAR PRODUCTOS EN LOTE (VERSIÓN TOLERANTE) ---
 app.post('/api/productos/batch-delete', async (req, res) => {
   const { ids } = req.body;
   try {
@@ -358,6 +332,7 @@ app.post('/api/ventas', async (req, res) => {
 // --- 10. HISTORIAL Y BÚSQUEDA ---
 app.get('/api/movimientos', async (req, res) => {
   try {
+    // 1. Primero obtenemos los movimientos con toda la data básica
     const movimientos = await prisma.movimientoStock.findMany({
       include: {
         Proveedor: true,
@@ -382,22 +357,27 @@ app.get('/api/movimientos', async (req, res) => {
       orderBy: { fecha_hora: 'desc' }
     });
 
+    // 2. Optimización: En lugar de hacer una consulta por cada IMEI, buscamos TODOS los orígenes de una sola vez
     const allIds = movimientos.flatMap(m => m.detalles.map(d => d.UnidadInventario_id_UnidadInventario));
+    
     const entradas = await prisma.detalleMovimiento.groupBy({
       by: ['UnidadInventario_id_UnidadInventario'],
       where: { UnidadInventario_id_UnidadInventario: { in: allIds } },
       _min: { MovimientoStock_id_MovimientoStock: true }
     });
+
     const entradaIds = entradas.map(e => e._min.MovimientoStock_id_MovimientoStock).filter(id => id !== null);
     const detallesEntrada = await prisma.detalleMovimiento.findMany({
       where: { MovimientoStock_id_MovimientoStock: { in: entradaIds } },
       include: { MovimientoStock: { include: { Proveedor: true } } }
     });
+
     const mapaProveedores = new Map();
     detallesEntrada.forEach(det => {
       mapaProveedores.set(det.UnidadInventario_id_UnidadInventario, det.MovimientoStock?.Proveedor);
     });
 
+    // 3. Armamos la respuesta final con los datos enriquecidos
     const movimientosEnriquecidos = movimientos.map(mov => ({
       ...mov,
       detalles: mov.detalles.map(det => ({
@@ -444,6 +424,55 @@ app.patch('/api/notificaciones/:id', async (req, res) => {
   const { id } = req.params;
   await prisma.notificacion.update({ where: { id_Notificacion: parseInt(id) }, data: { leida: true } });
   res.json({ message: 'Notificación leída' });
+});
+
+// --- 12. ELIMINAR MOVIMIENTO (COMPRA O VENTA) DEL HISTORIAL ---
+app.delete('/api/movimientos/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.$transaction(async (prisma) => {
+      // 1. Obtener el movimiento y sus detalles
+      const movimiento = await prisma.movimientoStock.findUnique({
+        where: { id_MovimientoStock: parseInt(id) },
+        include: { detalles: true }
+      });
+
+      if (!movimiento) {
+        throw new Error('Movimiento no encontrado');
+      }
+
+      // Obtener los IDs de las unidades involucradas
+      const idsUnidades = movimiento.detalles.map(d => d.UnidadInventario_id_UnidadInventario);
+
+      if (movimiento.tipo === 'SALIDA') {
+        // 2. Si es una VENTA: Restauramos las unidades a "DISPONIBLE"
+        await prisma.unidadInventario.updateMany({
+          where: { id_UnidadInventario: { in: idsUnidades } },
+          data: { estado: 'DISPONIBLE' }
+        });
+      } else if (movimiento.tipo === 'ENTRADA') {
+        // 3. Si es una COMPRA: Eliminamos las unidades (y sus detalles) que entraron en esa compra
+        await prisma.detalleMovimiento.deleteMany({
+          where: { UnidadInventario_id_UnidadInventario: { in: idsUnidades } }
+        });
+        await prisma.unidadInventario.deleteMany({
+          where: { id_UnidadInventario: { in: idsUnidades } }
+        });
+      }
+
+      // 4. Finalmente eliminamos los detalles y el movimiento en sí
+      await prisma.detalleMovimiento.deleteMany({
+        where: { MovimientoStock_id_MovimientoStock: parseInt(id) }
+      });
+      await prisma.movimientoStock.delete({
+        where: { id_MovimientoStock: parseInt(id) }
+      });
+    });
+    res.json({ message: 'Movimiento eliminado exitosamente' });
+  } catch (error) {
+    console.error("❌ Error eliminando movimiento:", error);
+    res.status(500).json({ error: 'No se pudo eliminar el movimiento' });
+  }
 });
 
 app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));

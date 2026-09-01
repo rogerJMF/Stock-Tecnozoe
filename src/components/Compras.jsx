@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, User, Smartphone, Calendar, Tag, MemoryStick, HardDrive, Palette, Truck } from 'lucide-react';
+import { Search, User, Smartphone, Calendar, Truck, MemoryStick, HardDrive, Palette, Trash2 } from 'lucide-react';
 
 export default function Compras() {
   const [movimientos, setMovimientos] = useState([]);
@@ -20,7 +20,6 @@ export default function Compras() {
     return () => clearInterval(interval);
   }, []);
 
-  // Procesar los datos con todos los detalles completos (Igual que Ventas)
   const comprasProcesadas = useMemo(() => {
     return movimientos
       .filter(m => m.tipo === 'ENTRADA')
@@ -36,11 +35,9 @@ export default function Compras() {
         color: d.UnidadInventario.Producto.Color?.nombre || 'Sin color',
         ram: d.UnidadInventario.Producto.Ram?.valor || 'N/A',
         almacenamiento: d.UnidadInventario.Producto.Almacenamiento?.Capacidad || 'N/A',
-        // A diferencia de Ventas, aquí no necesitamos el proveedorOrigen porque el proveedor ya es el de la compra
       })));
   }, [movimientos]);
 
-  // Filtrado de búsqueda en tiempo real (Ampliado para buscar por color, RAM, etc.)
   const comprasFiltradas = useMemo(() => {
     if (!searchTerm.trim()) return comprasProcesadas;
     const lowerSearch = searchTerm.toLowerCase().trim();
@@ -57,10 +54,19 @@ export default function Compras() {
     );
   }, [comprasProcesadas, searchTerm]);
 
+  // 🔥 Función para eliminar la compra
+  const eliminarCompra = async (id) => {
+    if (!window.confirm("⚠️ ¿Estás seguro de eliminar esta compra del historial? Esto borrará los IMEIs de la base de datos.")) return;
+    try {
+      await axios.delete(`${import.meta.env.VITE_API_URL}/api/movimientos/${id}`);
+      fetchMovimientos(); // Refrescar la lista
+    } catch (err) {
+      alert('❌ Error al eliminar: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   return (
     <div className="container mx-auto p-4 pt-24 text-white">
-      
-      {/* Encabezado y Barra de Búsqueda */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent flex items-center gap-3">
@@ -102,9 +108,14 @@ export default function Compras() {
                     </div>
                     <div className="text-[10px] text-slate-400 mt-1">Ref: <span className="text-white font-mono">{v.modeloRef}</span></div>
                   </div>
-                  <div className="flex items-center gap-2 bg-black/30 p-2 rounded-xl border border-white/5 group-hover:border-blue-500/20 transition-colors mt-1">
-                    <Smartphone className="w-4 h-4 text-blue-400 shrink-0" />
-                    <span className="font-mono text-xs text-slate-300 truncate">{v.imei}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 bg-black/30 p-2 rounded-xl border border-white/5 w-full group-hover:border-blue-500/20 transition-colors mt-1">
+                      <Smartphone className="w-4 h-4 text-blue-400 shrink-0" />
+                      <span className="font-mono text-xs text-slate-300 truncate">{v.imei}</span>
+                    </div>
+                    <button onClick={() => eliminarCompra(v.id)} className="p-2 ml-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-xl transition-all" title="Eliminar compra">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                   <div className="mt-3 pt-3 border-t border-white/5 flex justify-between items-center text-xs text-slate-400">
                     <div className="flex items-center gap-1.5 truncate max-w-[50%]">

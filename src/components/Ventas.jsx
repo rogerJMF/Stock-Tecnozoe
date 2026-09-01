@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, User, Smartphone, Calendar, Tag, MemoryStick, HardDrive, Palette, Truck } from 'lucide-react';
+import { Search, User, Smartphone, Calendar, Tag, MemoryStick, HardDrive, Palette, Truck, Trash2 } from 'lucide-react';
 
 export default function Ventas() {
   const [movimientos, setMovimientos] = useState([]);
@@ -20,7 +20,6 @@ export default function Ventas() {
     return () => clearInterval(interval);
   }, []);
 
-  // Procesar los datos con todos los detalles completos
   const ventasProcesadas = useMemo(() => {
     return movimientos
       .filter(m => m.tipo === 'SALIDA')
@@ -40,7 +39,6 @@ export default function Ventas() {
       })));
   }, [movimientos]);
 
-  // Filtrado de búsqueda en tiempo real
   const ventasFiltradas = useMemo(() => {
     if (!searchTerm.trim()) return ventasProcesadas;
     const lowerSearch = searchTerm.toLowerCase().trim();
@@ -58,6 +56,17 @@ export default function Ventas() {
     );
   }, [ventasProcesadas, searchTerm]);
 
+  // 🔥 Función para eliminar la venta
+  const eliminarVenta = async (id) => {
+    if (!window.confirm("⚠️ ¿Estás seguro de eliminar esta venta del historial? El teléfono volverá a estar disponible.")) return;
+    try {
+      await axios.delete(`${import.meta.env.VITE_API_URL}/api/movimientos/${id}`);
+      fetchMovimientos(); // Refrescar la lista
+    } catch (err) {
+      alert('❌ Error al eliminar: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   return (
     <div className="container mx-auto p-4 pt-24 text-white">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
@@ -71,7 +80,7 @@ export default function Ventas() {
         </div>
         <div className="relative w-full md:w-72 lg:w-96 group">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-green-400 transition-colors" />
-          <input type="text" placeholder="Buscar por color, RAM, IMEI, marca, cliente..." className="w-full pl-10 pr-10 py-3 bg-slate-800/70 backdrop-blur-sm border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all shadow-lg" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <input type="text" placeholder="Buscar por color, RAM, IMEI, cliente..." className="w-full pl-10 pr-10 py-3 bg-slate-800/70 backdrop-blur-sm border border-white/10 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all shadow-lg" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white transition-colors text-xs bg-slate-700/50 p-1 rounded-full hover:bg-slate-600">✕</button>}
         </div>
       </motion.div>
@@ -101,26 +110,25 @@ export default function Ventas() {
                     </div>
                     <div className="text-[10px] text-slate-400 mt-1">Ref: <span className="text-white font-mono">{v.modeloRef}</span></div>
                   </div>
-                  <div className="flex items-center gap-2 bg-black/30 p-2 rounded-xl border border-white/5 group-hover:border-green-500/20 transition-colors mt-1">
-                    <Smartphone className="w-4 h-4 text-green-400 shrink-0" />
-                    <span className="font-mono text-xs text-slate-300 truncate">{v.imei}</span>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs text-slate-400 gap-1 sm:gap-2">
-                    <div className="flex flex-col sm:flex-row gap-1 sm:gap-3 w-full sm:w-auto">
-                      <div className="flex items-center gap-1.5">
-                        <Truck className="w-3 h-3 text-blue-400/70" />
-                        <span className="truncate font-medium text-slate-300" title={v.proveedorOrigen}>
-                          Orig: {v.proveedorOrigen}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <User className="w-3 h-3 text-green-400/70" />
-                        <span className="truncate font-medium text-slate-300" title={v.cliente?.nombre || 'Sin cliente'}>
-                          {v.cliente?.nombre || <span className="italic text-slate-500">Sin cliente</span>}
-                        </span>
-                      </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 bg-black/30 p-2 rounded-xl border border-white/5 w-full group-hover:border-green-500/20 transition-colors mt-1">
+                      <Smartphone className="w-4 h-4 text-green-400 shrink-0" />
+                      <span className="font-mono text-xs text-slate-300 truncate">{v.imei}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => eliminarVenta(v.id)} className="p-2 ml-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-xl transition-all" title="Eliminar venta">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-white/5 flex justify-between items-center text-xs text-slate-400">
+                    <div className="flex items-center gap-1.5 truncate max-w-[50%]">
+                      <Truck className="w-3 h-3 text-blue-400/70" />
+                      <span className="truncate font-medium text-slate-300">{v.proveedorOrigen || 'Sin proveedor'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 truncate max-w-[45%] justify-end">
+                      <User className="w-3 h-3 text-green-400/70" />
+                      <span className="truncate font-medium text-slate-300">{v.cliente?.nombre || 'Sin cliente'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
                       <Calendar className="w-3 h-3 text-purple-400/60" />
                       <span className="font-mono">{v.fecha}</span>
                     </div>
